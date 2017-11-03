@@ -8,13 +8,23 @@ import android.util.Log;
 import java.io.FileDescriptor;
 
 /**
- * Created by bridgegeorge on 16/7/5.
+ * 提供了图片压缩方法和从不同源中加载Bitmap的方法
  */
 public class ImageResizer {
     private static final String TAG = "ImageResizer";
 
     public ImageResizer() {
     }
+
+    /**
+     * 根据请求的尺寸从资源文件中载入Bitmap
+     *
+     * @param res
+     * @param resId
+     * @param reqWidth
+     * @param reqHeight
+     * @return
+     */
 
     public Bitmap decodeSampleBitmapFromResource(Resources res, int resId, int reqWidth, int reqHeight) {
         //First decode with inJustDecodeBounds=true to check dimensions
@@ -28,13 +38,23 @@ public class ImageResizer {
         return BitmapFactory.decodeResource(res, resId, options);
     }
 
-    public Bitmap decodeSampleBitmapFromFileDescriptor(FileDescriptor fd, int reqWidth, int reqHeigth) {
+    /**
+     * 根据请求的bitmap 尺寸 从文件描述中载入bitmap
+     *
+     * @param fd
+     * @param reqWidth
+     * @param reqHeight
+     * @return
+     */
+
+    public Bitmap decodeSampleBitmapFromFileDescriptor(FileDescriptor fd, int reqWidth, int reqHeight) {
         //First decode width inJustDecodeBounds=true to check dimensions
         final BitmapFactory.Options options = new BitmapFactory.Options();
         options.inJustDecodeBounds = true;
         BitmapFactory.decodeFileDescriptor(fd, null, options);
         //Calculate inSampleSize
-        options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeigth);
+
+        options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight);
         //Decode bitmap width inSampleSize set
         options.inJustDecodeBounds = false;
         return BitmapFactory.decodeFileDescriptor(fd, null, options);
@@ -42,7 +62,19 @@ public class ImageResizer {
 
     }
 
+    /**
+     * 根据请求尺寸 计算 inSampleSize 参数
+     * inSampleSize 参数指定了宽和高的缩放比例 例如 inSampleSize=1 那么就是原始尺寸
+     * inSampleSize=2 那么 宽高就是 1/2  整体像素数减少 到1/4
+     *
+     * @param options
+     * @param reqWidth
+     * @param reqHeight
+     * @return
+     */
+
     private int calculateInSampleSize(BitmapFactory.Options options, int reqWidth, int reqHeight) {
+        //0 代表 不进行inSample 计算压缩
         if (reqWidth == 0 || reqHeight == 0) {
             return 1;
         }

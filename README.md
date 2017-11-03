@@ -45,7 +45,7 @@ Android本地、网络图片加载库。
 * 支持file、drawable、assets、content等Schema图片的加载
 
 ##License
-Copyright 2013 Bridge George
+Copyright 2016 Bridge George
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

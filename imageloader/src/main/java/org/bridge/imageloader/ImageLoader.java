@@ -46,12 +46,12 @@ public class ImageLoader {
 
 
     /**
-     *
+     * Handler Message.what 值，标识用于切换到主线程进行图片显示
      */
     private static final int MESSAGE_POST_RESULT = 1;
 
     /**
-     * the number of processor cores available to the VM
+     * 可用CPU 核心数
      */
     private static final int CPU_COUNT = Runtime.getRuntime().availableProcessors();
 
@@ -64,12 +64,12 @@ public class ImageLoader {
      */
     private static final int MAXIMUM_POOL_SIZE = CPU_COUNT * 2 + 1;
     /**
-     *
+     * 存活时间10
      */
     private static final long KEEP_ALIVE = 10L;
 
     /**
-     *
+     * imageView tag标识
      */
     private static final int TAG_KEY_URI = R.id.imageloader_uri;
     /**
@@ -85,13 +85,10 @@ public class ImageLoader {
      */
     private static final int DISK_CACHE_INDEX = 0;
     /**
-     *
+     * 磁盘缓存创建标识 默认false
      */
     private boolean mIsDiskLruCacheCreated = false;
 
-    /**
-     *
-     */
 
     private static class LoaderResult {
         public ImageView imageView;
@@ -105,6 +102,10 @@ public class ImageLoader {
         }
     }
 
+    /**
+     * 线程工厂方法
+     */
+
     private static final ThreadFactory sThreadFactory = new ThreadFactory() {
 
         private final AtomicInteger mCount = new AtomicInteger(1);
@@ -115,11 +116,11 @@ public class ImageLoader {
         }
     };
     /**
-     *
+     * 线程池
      */
     private static final Executor THREAD_POOL_EXECUTOR = new ThreadPoolExecutor(CORE_POOL_SIZE, MAXIMUM_POOL_SIZE, KEEP_ALIVE, TimeUnit.SECONDS, new LinkedBlockingDeque<Runnable>(), sThreadFactory);
     /**
-     *
+     * 主线程Handler
      */
     private Handler mMainHandler = new Handler(Looper.getMainLooper()) {
         @Override
@@ -127,6 +128,7 @@ public class ImageLoader {
             LoaderResult result = (LoaderResult) msg.obj;
             ImageView imageView = result.imageView;
             imageView.setImageBitmap(result.bitmap);
+            //检查ImageView URL 是否发生变化，解决ListView/GridView 加载乱序问题
             String uri = (String) imageView.getTag(TAG_KEY_URI);
             if (uri.equals(result.uri)) {
                 imageView.setImageBitmap(result.bitmap);
@@ -137,23 +139,25 @@ public class ImageLoader {
     };
 
     /**
-     *
+     * mContext
      */
     private final Context mContext;
     /**
-     *
+     * ImageResizer 图片压缩和加载器
      */
     private ImageResizer mImageResizer = new ImageResizer();
     /**
-     *
+     * LurCache 内存缓存
      */
     private LruCache<String, Bitmap> mMemoryCache;
     /**
-     *
+     * DiskLruCache 磁盘缓存
      */
     private DiskLruCache mDiskLruCache;
 
     /**
+     * 私有构造方法
+     *
      * @param context
      */
     private ImageLoader(Context context) {
@@ -166,6 +170,7 @@ public class ImageLoader {
                 return value.getRowBytes() * value.getHeight() / 1024;
             }
         };
+        //创建DiskCacheDir磁盘缓存
         File diskCacheDir = getDiskCacheDir(mContext, "bitmap");
         if (!diskCacheDir.exists()) {
             diskCacheDir.mkdirs();
@@ -192,6 +197,8 @@ public class ImageLoader {
     }
 
     /**
+     * 将 指定的bitmap 加入 内存缓存中
+     *
      * @param key
      * @param bitmap
      */
@@ -202,6 +209,8 @@ public class ImageLoader {
     }
 
     /**
+     * 从 内存缓存中取得bitmap
+     *
      * @param key
      * @return
      */
@@ -232,12 +241,17 @@ public class ImageLoader {
      */
     public void bindBitmap(final String uri, final ImageView imageView, final int reqWidth, final int reqHeight) {
 
+
+        //内存中有直接取得
+
         imageView.setTag(TAG_KEY_URI, uri);
         Bitmap bitmap = loadBitmapFromMemCache(uri);
         if (bitmap != null) {
             imageView.setImageBitmap(bitmap);
             return;
         }
+
+        //否则创建Runnable,丢到线程池中进行处理
 
         Runnable loadBitmapTask = new Runnable() {
             @Override
@@ -261,6 +275,8 @@ public class ImageLoader {
      * @return bitmap, maybe null.
      */
     public Bitmap loadBitmap(String uri, int reqWidth, int reqHeight) {
+
+        //1.先从内存中取
         Bitmap bitmap = loadBitmapFromMemCache(uri);
         if (bitmap != null) {
             Log.d(TAG, "loadBitmapFromMemCache,uri:" + uri);
@@ -268,16 +284,19 @@ public class ImageLoader {
         }
 
         try {
+            //2.从磁盘缓存当中取
             bitmap = loadBitmapFromDiskCache(uri, reqWidth, reqHeight);
             if (bitmap != null) {
                 Log.d(TAG, "loadBitmapFromDiskCache,uri:" + uri);
                 return bitmap;
             }
+            //3.从网络中取，后续执行了缓存操作
             bitmap = loadBitmapFromHttp(uri, reqWidth, reqHeight);
             Log.d(TAG, "loadBitmapFromHttp,uri:" + uri);
         } catch (IOException e) {
             e.printStackTrace();
         }
+        //遇到错误，硬盘缓存没有创建那么直接从网络中取，不进行缓存
         if (bitmap == null && !mIsDiskLruCacheCreated) {
             Log.w(TAG, "encounter error,DiskLruCache is not created.");
             bitmap = downloadBitmapFromUrl(uri);
@@ -286,6 +305,8 @@ public class ImageLoader {
     }
 
     /**
+     * 从内存中加载bitmap
+     *
      * @param uri
      * @return
      */
@@ -296,6 +317,8 @@ public class ImageLoader {
     }
 
     /**
+     * 从网络加载Bitmap
+     *
      * @param url
      * @param reqWidth
      * @param reqHeight
@@ -309,10 +332,12 @@ public class ImageLoader {
         if (mDiskLruCache == null) {
             return null;
         }
+        //创建磁盘条目
         String key = hashKeyFormUrl(url);
         DiskLruCache.Editor editor = mDiskLruCache.edit(key);
         if (editor != null) {
             OutputStream outputStream = editor.newOutputStream(DISK_CACHE_INDEX);
+            //从网络加载数据，并写入文件系统
             if (downLoadUrlToStream(url, outputStream)) {
                 editor.commit();
             } else {
@@ -320,14 +345,17 @@ public class ImageLoader {
             }
             mDiskLruCache.flush();
         }
+        //最后再从磁盘中取得这个bitmap
         return loadBitmapFromDiskCache(url, reqWidth, reqHeight);
     }
 
     /**
+     * 从磁盘缓存中加载Bitmap
+     *
      * @param url
      * @param reqWidth
      * @param reqHeight
-     * @return
+     * @return Bitmap
      * @throws IOException
      */
     private Bitmap loadBitmapFromDiskCache(String url, int reqWidth, int reqHeight) throws IOException {
@@ -341,9 +369,13 @@ public class ImageLoader {
         String key = hashKeyFormUrl(url);
         DiskLruCache.Snapshot snapShot = mDiskLruCache.get(key);
         if (snapShot != null) {
+            //取硬盘缓存文件输入流
             FileInputStream fileInputStream = (FileInputStream) snapShot.getInputStream(DISK_CACHE_INDEX);
+            //拿到文件描述符
             FileDescriptor fileDescriptor = fileInputStream.getFD();
+            //加载图片
             bitmap = mImageResizer.decodeSampleBitmapFromFileDescriptor(fileDescriptor, reqWidth, reqHeight);
+            //加入内存缓存中
             if (bitmap != null) {
                 addBitmapToMemoryCache(key, bitmap);
             }
@@ -352,6 +384,8 @@ public class ImageLoader {
     }
 
     /**
+     * 从网络下载图片，构建一个输出流
+     *
      * @param urlString
      * @param outputStream
      * @return
@@ -393,6 +427,8 @@ public class ImageLoader {
     }
 
     /**
+     * 建立网络连接，下载图片，返回Bitmap
+     *
      * @param urlString
      * @return
      */
@@ -428,6 +464,8 @@ public class ImageLoader {
     }
 
     /**
+     * 对URL进行 MD5加密，返回加密后得到字符串
+     *
      * @param url
      * @return
      */
@@ -462,9 +500,12 @@ public class ImageLoader {
     }
 
     /**
+     * 判断SD卡是否可用，
+     * 如果可用返回SD卡存储路径，否则返回内部存储路径
+     *
      * @param context
      * @param uniqueName
-     * @return
+     * @return file 路径
      */
     public File getDiskCacheDir(Context context, String uniqueName) {
 
