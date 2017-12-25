@@ -162,7 +162,9 @@ public class ImageLoader {
      */
     private ImageLoader(Context context) {
         mContext = context.getApplicationContext();
+        //当前进程可用最大内存
         int maxMemory = (int) (Runtime.getRuntime().maxMemory() / 1024);
+        //内存缓存大小是可用最大内存的1/8
         int cacheSize = maxMemory / 8;
         mMemoryCache = new LruCache<String, Bitmap>(cacheSize) {
             @Override
@@ -186,7 +188,7 @@ public class ImageLoader {
     }
 
     /**
-     * bulid a new instance of ImageLoader
+     * 创建实例
      *
      * @param context
      * @return a new instance of ImageLoader
@@ -256,7 +258,7 @@ public class ImageLoader {
         Runnable loadBitmapTask = new Runnable() {
             @Override
             public void run() {
-                Bitmap bitmap = loadBitmap(uri, reqWidth, reqHeight);
+                Bitmap bitmap = loadBitmapInternal(uri, reqWidth, reqHeight);
                 if (bitmap != null) {
                     LoaderResult result = new LoaderResult(imageView, uri, bitmap);
                     mMainHandler.obtainMessage(MESSAGE_POST_RESULT, result).sendToTarget();
@@ -266,15 +268,16 @@ public class ImageLoader {
         THREAD_POOL_EXECUTOR.execute(loadBitmapTask);
     }
 
+
     /**
-     * load bitmap form memory cache  or disk cache or network
+     * 从缓存，磁盘，或者网络中加载
      *
-     * @param uri       http url
-     * @param reqWidth  the width ImageView desired
-     * @param reqHeight the height ImageView desired
+     * @param uri
+     * @param reqWidth
+     * @param reqHeight
      * @return bitmap, maybe null.
      */
-    public Bitmap loadBitmap(String uri, int reqWidth, int reqHeight) {
+    private Bitmap loadBitmapInternal(String uri, int reqWidth, int reqHeight) {
 
         //1.先从内存中取
         Bitmap bitmap = loadBitmapFromMemCache(uri);
@@ -390,7 +393,7 @@ public class ImageLoader {
      * @param outputStream
      * @return
      */
-    public boolean downLoadUrlToStream(String urlString, OutputStream outputStream) {
+    private boolean downLoadUrlToStream(String urlString, OutputStream outputStream) {
         HttpURLConnection urlConnection = null;
         BufferedOutputStream out = null;
         BufferedInputStream in = null;
@@ -483,6 +486,8 @@ public class ImageLoader {
     }
 
     /**
+     * 字节数据转化为 16进制字符串
+     *
      * @param bytes
      * @return
      */
@@ -507,7 +512,7 @@ public class ImageLoader {
      * @param uniqueName
      * @return file 路径
      */
-    public File getDiskCacheDir(Context context, String uniqueName) {
+    private File getDiskCacheDir(Context context, String uniqueName) {
 
         boolean externalStorageAvailable = Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED);
         final String cachePath;
@@ -518,6 +523,13 @@ public class ImageLoader {
         }
         return new File(cachePath + File.separator + uniqueName);
     }
+
+    /**
+     * 获得分区可用空间大小单位为字节
+     *
+     * @param path
+     * @return
+     */
 
     @TargetApi(Build.VERSION_CODES.GINGERBREAD)
     private long getUsableSpace(File path) {
