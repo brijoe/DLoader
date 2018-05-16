@@ -1,3 +1,5 @@
+[![](https://jitpack.io/v/brijoe/DLoader.svg)](https://jitpack.io/#brijoe/DLoader)
+
 # DLoader
 
 简易的Android网络图片加载库，适用于较小规模的网络图片加载需求，仅供学习和研究。
@@ -10,6 +12,29 @@
 
 
 ## 使用
+
+
+在Project 级别的build.gradle 文件中引入以下配置：
+
+```
+	allprojects {
+		repositories {
+			...
+			maven { url 'https://jitpack.io' }
+		}
+	}
+```
+
+在你项目的module级别的 build.gradle文件中引入
+
+```
+dependencies {
+		 ...
+	   implementation 'com.github.brijoe:DLoader:1.0.0'
+	    ...
+	}
+
+```
 
 任何需要的地方调用以下代码
 
